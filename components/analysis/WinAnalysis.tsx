@@ -11,6 +11,7 @@ interface WinAnalysisData {
   message?: string;
   total_won?: number;
   total_value_won?: number;
+  avg_value_won?: number;
   avg_cycle_length?: number;
   insights?: WinInsight[];
 }
@@ -48,23 +49,32 @@ export default function WinAnalysis({ data }: WinAnalysisProps) {
         <h3 className="text-xl font-semibold text-gray-800">Win Analysis</h3>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-green-50 p-4 rounded-lg">
-          <p className="text-sm text-gray-600">Total Won Opportunities</p>
-          <p className="text-xl font-semibold text-green-600">{data.total_won}</p>
+      <div className="grid grid-cols-4 gap-3 mb-6">
+        <div className="bg-green-50 p-3 rounded-lg">
+          <p className="text-xs text-gray-600 mb-1">Total Won Opportunities</p>
+          <p className="text-lg font-semibold text-green-600">{data.total_won}</p>
         </div>
-        <div className="bg-green-50 p-4 rounded-lg">
-          <p className="text-sm text-gray-600">Total Value Won</p>
-          <p className="text-xl font-semibold text-green-600">
+        <div className="bg-green-50 p-3 rounded-lg">
+          <p className="text-xs text-gray-600 mb-1">Total Value Won</p>
+          <p className="text-lg font-semibold text-green-600">
             ${data.total_value_won?.toLocaleString(undefined, {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2
             })}
           </p>
         </div>
-        <div className="bg-green-50 p-4 rounded-lg">
-          <p className="text-sm text-gray-600">Avg. Sales Cycle</p>
-          <p className="text-xl font-semibold text-green-600">
+        <div className="bg-green-50 p-3 rounded-lg">
+          <p className="text-xs text-gray-600 mb-1">Average Value</p>
+          <p className="text-lg font-semibold text-green-600">
+            ${data.avg_value_won?.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
+            })}
+          </p>
+        </div>
+        <div className="bg-green-50 p-3 rounded-lg">
+          <p className="text-xs text-gray-600 mb-1">Avg. Sales Cycle</p>
+          <p className="text-lg font-semibold text-green-600">
             {Math.round(data.avg_cycle_length || 0)} days
           </p>
         </div>

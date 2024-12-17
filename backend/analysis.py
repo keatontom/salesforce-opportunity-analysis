@@ -258,6 +258,64 @@ class SalesOpportunityAnalyzer:
             }
         }
     
+    def analyze_practice_area_stats(self, opportunities: pd.DataFrame) -> List[Dict[str, Any]]:
+        """Helper method to consistently analyze practice areas for both won and lost opportunities"""
+        practice_stats = []
+        all_practices = set()
+        current_stage = opportunities['Stage'].iloc[0]  # 'Won' or 'Lost'
+        total_stage_opps = len(opportunities)  # Total won or lost opportunities
+        
+        # First, collect all unique practice areas
+        for practices in self.data['Law Firm Practice Area'].dropna():
+            if isinstance(practices, str):
+                # Filter out 'other' and similar categories
+                practices_filtered = [
+                    p.strip() for p in practices.split(';') 
+                    if p.strip() and p.strip().lower() not in ['unknown', 'other', 'others', 'n/a']
+                ]
+                all_practices.update(practices_filtered)
+        
+        # Create a DataFrame to store practice area metrics
+        practice_metrics = []
+        
+        for practice in all_practices:
+            # For each practice area, look at opportunities that include this practice
+            practice_mask = opportunities['Law Firm Practice Area'].fillna('').str.contains(practice, regex=False, case=False, na=False)
+            practice_opps = opportunities[practice_mask]
+            
+            if len(practice_opps) > 0:
+                # Calculate the percentage this practice area represents of all won/lost opportunities
+                practice_percentage = (len(practice_opps) / total_stage_opps) * 100
+                practice_value = practice_opps['Total ACV'].sum()
+                
+                practice_metrics.append({
+                    'practice': practice,
+                    'count': len(practice_opps),
+                    'total_count': total_stage_opps,
+                    'value': practice_value,
+                    'percentage': practice_percentage,
+                    'value_per_opp': practice_value / len(practice_opps)
+                })
+        
+        # Convert to DataFrame for easier sorting
+        if practice_metrics:
+            df = pd.DataFrame(practice_metrics)
+            
+            # Sort by percentage and value
+            df = df.sort_values(['percentage', 'value'], ascending=[False, False])
+            
+            # Convert to required format
+            for _, row in df.iterrows():
+                practice_stats.append({
+                    'practice': row['practice'],
+                    'text': f"  • {row['practice']}: {row['percentage']:.1f}% {current_stage.lower()} ({int(row['count'])}/{int(row['total_count'])} {current_stage.lower()}, ${row['value']:,.2f})",
+                    'rate': row['percentage'],
+                    'value': row['value'],
+                    'count': row['count']
+                })
+        
+        return practice_stats
+    
     def analyze_loss_patterns(self) -> Dict[str, Any]:
         """
         Analyze patterns in lost opportunities
@@ -266,8 +324,6 @@ class SalesOpportunityAnalyzer:
         
         if len(lost_opps) == 0:
             return {"message": "No lost opportunities to analyze", "has_data": False}
-        
-        insights = []
         
         # Analyze Lost Reasons
         lost_reasons = lost_opps['Closed Lost Reason'].value_counts()
@@ -299,7 +355,7 @@ class SalesOpportunityAnalyzer:
                 lost_value = type_data[type_data['Stage'] == 'Lost']['Total ACV'].sum()
                 type_stats.append({
                     'type': type_name,
-                    'text': f"• {type_name}: {loss_rate:.1f}% loss rate ({lost_type}/{total_type} lost, ${lost_value:,.2f})",
+                    'text': f"  • {type_name}: {loss_rate:.1f}% loss rate ({lost_type}/{total_type} lost, ${lost_value:,.2f})",
                     'loss_rate': loss_rate,
                     'value': lost_value
                 })
@@ -321,10 +377,17 @@ class SalesOpportunityAnalyzer:
         for size in size_loss_rate.index:
             count = size_loss_rate.loc[size, 'Opportunity Name']
             value = size_loss_rate.loc[size, 'Total ACV']
-            size_summary.append(f"• {size}: {count} losses (${value:,.2f} total value)")
+            size_summary.append(f"  • {size.replace('Small', '0-50 Lawyers').replace('Medium', '51-200 Lawyers').replace('Large', '201-500 Lawyers').replace('Enterprise', '500+ Lawyers').replace(' (', ' (').replace(')', '')}: {count} losses (${value:,.2f} total value)")
+
+        # Analyze Practice Areas
+        practice_stats = self.analyze_practice_area_stats(lost_opps)
+        practice_stats.sort(key=lambda x: (-x['rate'], -x['value']))
+        practice_summary = [item['text'] for item in practice_stats[:5]]  # Top 5
 
         # Analyze Campaigns
         def categorize_campaign(campaign):
+            if pd.isna(campaign) or str(campaign).lower().strip() in ['', 'unknown', 'other', 'none']:
+                return None
             campaign = str(campaign).lower()
             if 'email' in campaign or 'newsletter' in campaign:
                 return 'Email Campaigns'
@@ -336,8 +399,12 @@ class SalesOpportunityAnalyzer:
                 return 'Referrals'
             elif 'partner' in campaign:
                 return 'Partner Programs'
+            elif 'social' in campaign:
+                return 'Social Media'
+            elif 'content' in campaign or 'blog' in campaign:
+                return 'Content Marketing'
             else:
-                return None
+                return campaign.title()
 
         lost_opps['Campaign Category'] = lost_opps['Primary Campaign Source'].apply(categorize_campaign)
         lost_opps_with_campaigns = lost_opps[lost_opps['Campaign Category'].notna()]
@@ -350,43 +417,49 @@ class SalesOpportunityAnalyzer:
         for campaign in campaign_stats.index:
             count = int(pd.to_numeric(campaign_stats.loc[campaign, 'Opportunity Name']))
             value = campaign_stats.loc[campaign, 'Total ACV']
-            if count >= 3:  # Only include campaigns with meaningful data
+            if count >= 2:  # Lower threshold to show more campaigns
                 campaign_summary.append({
                     'campaign': campaign,
-                    'text': f"• {campaign}: {count} losses (${value:,.2f} total value)",
+                    'text': f"  • {campaign}: {count} losses (${value:,.2f} total value)",
                     'count': count,
                     'value': value
                 })
 
-        # Sort by count and value
+        # Sort by count and value and take top 3
         campaign_summary.sort(key=lambda x: (-x['count'], -x['value']))
-        campaign_text = [item['text'] for item in campaign_summary]
+        campaign_text = [item['text'] for item in campaign_summary[:3]]  # Take top 3
 
         return {
             "has_data": True,
             "total_lost": len(lost_opps),
             "total_value_lost": lost_opps['Total ACV'].sum(),
-            "avg_cycle_length": lost_opps['Time_To_Close'].mean(),
+            "avg_value_lost": lost_opps['Total ACV'].mean(),
+            "avg_cycle_length": int(round(lost_opps['Time_To_Close'].mean())),
             "insights": [
                 {
-                    "category": "Loss Reasons",
-                    "finding": "\n".join(reason_summary),
+                    "category": "Practice Area Failures",
+                    "finding": "\n".join(practice_summary),
                     "severity": "high"
                 },
                 {
-                    "category": "Type Analysis",
+                    "category": "Type Performance",
                     "finding": "\n".join(type_summary),
                     "severity": "high" if any(x['loss_rate'] > 75 for x in type_stats) else "medium"
                 },
                 {
-                    "category": "Firm Size Distribution",
-                    "finding": "\n".join(size_summary),
+                    "category": "Campaign Performance",
+                    "finding": "\n".join(campaign_text) if campaign_text else "No significant campaign data available",
                     "severity": "medium"
                 },
                 {
-                    "category": "Campaign Analysis",
-                    "finding": "\n".join(campaign_text),
-                    "severity": "high" if any(x['count'] >= 5 for x in campaign_summary) else "medium"
+                    "category": "Failure Reasons",
+                    "finding": "\n".join(reason_summary),
+                    "severity": "high"
+                },
+                {
+                    "category": "Lawyer Count Distribution",
+                    "finding": "\n".join(size_summary),
+                    "severity": "medium"
                 }
             ]
         }
@@ -418,33 +491,12 @@ class SalesOpportunityAnalyzer:
         for size in size_win_rate.index:
             count = size_win_rate.loc[size, 'Opportunity Name']
             value = size_win_rate.loc[size, 'Total ACV']
-            size_summary.append(f"• {size}: {count} wins (${value:,.2f} total value)")
+            size_summary.append(f"  • {size.replace('Small', '0-50 Lawyers').replace('Medium', '51-200 Lawyers').replace('Large', '201-500 Lawyers').replace('Enterprise', '500+ Lawyers').replace(' (', ' (').replace(')', '')}: {count} wins (${value:,.2f} total value)")
 
-        # Analyze by Practice Area
-        practice_win_rates = []
-        seen_practices = set()
-        for practice in won_opps['Law Firm Practice Area'].dropna().str.split(';').explode().unique():
-            practice = practice.strip()
-            if practice in seen_practices or practice == '' or practice == 'Unknown':
-                continue
-            seen_practices.add(practice)
-            
-            practice_opps = self.data[self.data['Law Firm Practice Area'].str.contains(practice, na=False)]
-            total_opps = len(practice_opps)
-            won_count = len(practice_opps[practice_opps['Stage'] == 'Won'])
-            if total_opps >= 5:  # Only include areas with meaningful sample size
-                win_rate = (won_count / total_opps) * 100
-                total_value = practice_opps[practice_opps['Stage'] == 'Won']['Total ACV'].sum()
-                practice_win_rates.append({
-                    'practice': practice,
-                    'text': f"• {practice}: {win_rate:.1f}% win rate ({won_count}/{total_opps} won, ${total_value:,.2f})",
-                    'win_rate': win_rate,
-                    'value': total_value
-                })
-
-        # Sort by win rate and value
-        practice_win_rates.sort(key=lambda x: (-x['win_rate'], -x['value']))
-        practice_summary = [item['text'] for item in practice_win_rates[:5]]  # Top 5
+        # Analyze Practice Areas
+        practice_stats = self.analyze_practice_area_stats(won_opps)
+        practice_stats.sort(key=lambda x: (-x['rate'], -x['value']))
+        practice_summary = [item['text'] for item in practice_stats[:5]]  # Top 5
 
         # Analyze by Type
         type_stats = []
@@ -457,7 +509,7 @@ class SalesOpportunityAnalyzer:
                 value = type_data[type_data['Stage'] == 'Won']['Total ACV'].sum()
                 type_stats.append({
                     'type': type_name,
-                    'text': f"• {type_name}: {win_rate:.1f}% win rate ({won_type}/{total_type} won, ${value:,.2f})",
+                    'text': f"  • {type_name}: {win_rate:.1f}% win rate ({won_type}/{total_type} won, ${value:,.2f})",
                     'win_rate': win_rate,
                     'value': value
                 })
@@ -468,6 +520,8 @@ class SalesOpportunityAnalyzer:
 
         # Analyze Campaigns
         def categorize_campaign(campaign):
+            if pd.isna(campaign) or str(campaign).lower().strip() in ['', 'unknown', 'other', 'none']:
+                return None
             campaign = str(campaign).lower()
             if 'email' in campaign or 'newsletter' in campaign:
                 return 'Email Campaigns'
@@ -479,8 +533,12 @@ class SalesOpportunityAnalyzer:
                 return 'Referrals'
             elif 'partner' in campaign:
                 return 'Partner Programs'
+            elif 'social' in campaign:
+                return 'Social Media'
+            elif 'content' in campaign or 'blog' in campaign:
+                return 'Content Marketing'
             else:
-                return None
+                return campaign.title()
 
         won_opps['Campaign Category'] = won_opps['Primary Campaign Source'].apply(categorize_campaign)
         won_opps_with_campaigns = won_opps[won_opps['Campaign Category'].notna()]
@@ -493,37 +551,33 @@ class SalesOpportunityAnalyzer:
         for campaign in campaign_stats.index:
             count = int(pd.to_numeric(campaign_stats.loc[campaign, 'Opportunity Name']))
             value = campaign_stats.loc[campaign, 'Total ACV']
-            if count >= 3:  # Only include campaigns with meaningful data
+            if count >= 2:  # Lower threshold to show more campaigns
                 total_campaign = len(self.data[self.data['Primary Campaign Source'].str.contains(campaign, na=False, case=False)])
                 if total_campaign > 0:  # Prevent division by zero
                     win_rate = count / total_campaign * 100
                     campaign_summary.append({
                         'campaign': campaign,
-                        'text': f"• {campaign}: {count} wins (${value:,.2f} total value)",
+                        'text': f"  • {campaign}: {count} wins (${value:,.2f} total value)",
                         'win_rate': win_rate,
                         'value': value,
                         'count': count
                     })
 
-        # Sort by count and value
+        # Sort by count and value and take top 3
         campaign_summary.sort(key=lambda x: (-x['count'], -x['value']))
-        campaign_text = [item['text'] for item in campaign_summary]
+        campaign_text = [item['text'] for item in campaign_summary[:3]]  # Take top 3
 
         return {
             "has_data": True,
             "total_won": total_won,
             "total_value_won": total_value_won,
+            "avg_value_won": total_value_won / total_won if total_won > 0 else 0,
             "avg_cycle_length": avg_cycle_length,
             "insights": [
                 {
-                    "category": "Firm Size Distribution",
-                    "finding": "\n".join(size_summary),
-                    "severity": "medium"
-                },
-                {
-                    "category": "Practice Area Success",
+                    "category": "Practice Area Successes",
                     "finding": "\n".join(practice_summary),
-                    "severity": "medium"
+                    "severity": "high"
                 },
                 {
                     "category": "Type Performance",
@@ -532,7 +586,12 @@ class SalesOpportunityAnalyzer:
                 },
                 {
                     "category": "Campaign Performance",
-                    "finding": "\n".join(campaign_text),
+                    "finding": "\n".join(campaign_text) if campaign_text else "No significant campaign data available",
+                    "severity": "medium"
+                },
+                {
+                    "category": "Lawyer Count Distribution",
+                    "finding": "\n".join(size_summary),
                     "severity": "medium"
                 }
             ]

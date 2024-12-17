@@ -48,15 +48,6 @@ export default function AnalysisResults({ results, onDateRangeChange }: Analysis
           volumeData={results.Visualizations["Volume Trend"]}
         />
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <WinAnalysis 
-            data={results["Advanced Analysis"]["Win Analysis"]}
-          />
-          <LossAnalysis 
-            data={results["Advanced Analysis"]["Loss Analysis"]}
-          />
-        </div>
-        
         <PerformanceTable 
           data={results["Advanced Analysis"]["Segment Performance"]["Type Performance"]}
           title="Type Performance"
@@ -84,6 +75,18 @@ export default function AnalysisResults({ results, onDateRangeChange }: Analysis
           title="Account Performance"
           nameField="Account Name"
         />
+        
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Analysis by Stage</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <WinAnalysis 
+              data={results["Advanced Analysis"]["Win Analysis"]}
+            />
+            <LossAnalysis 
+              data={results["Advanced Analysis"]["Loss Analysis"]}
+            />
+          </div>
+        </div>
       </div>
 
       {showAgingOpportunities && (

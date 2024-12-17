@@ -4,8 +4,7 @@ import { useState } from 'react'
 import FileUpload from '@/components/FileUpload'
 import Loading from '@/components/Loading'
 import AnalysisResults from '@/components/AnalysisResults'
-import { AnalysisResults as AnalysisResultsType } from '@/types/analysis'
-import { analyzeFile } from '../lib/api'
+import { analyzeFile, AnalysisResults as AnalysisResultsType } from '../lib/api'
 import { DateRange } from '@/components/analysis/DateFilter'
 
 export default function Home() {

@@ -11,6 +11,7 @@ interface LossAnalysisData {
   message?: string;
   total_lost?: number;
   total_value_lost?: number;
+  avg_value_lost?: number;
   avg_cycle_length?: number;
   insights?: LossInsight[];
 }
@@ -30,11 +31,15 @@ export default function LossAnalysis({ data }: LossAnalysisProps) {
   }
 
   const formatBulletPoints = (text: string) => {
-    return text.split('\n').map((line, index) => (
-      <div key={index} className={`${index === 0 ? 'font-medium mb-2' : 'ml-4'}`}>
-        {line}
-      </div>
-    ));
+    return text.split('\n').map((line, index) => {
+      if (!line.trim()) return null;
+      const isMainPoint = !line.startsWith('  •');
+      return (
+        <div key={index} className={`${isMainPoint ? '' : 'ml-4'} ${line.trim().startsWith('•') ? 'mb-1' : 'mb-2'}`}>
+          {line.trim()}
+        </div>
+      );
+    }).filter(Boolean);
   };
 
   return (
@@ -44,23 +49,32 @@ export default function LossAnalysis({ data }: LossAnalysisProps) {
         <h3 className="text-xl font-semibold text-gray-800">Loss Analysis</h3>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-red-50 p-4 rounded-lg">
-          <p className="text-sm text-gray-600">Total Lost Opportunities</p>
-          <p className="text-xl font-semibold text-red-600">{data.total_lost}</p>
+      <div className="grid grid-cols-4 gap-3 mb-6">
+        <div className="bg-red-50 p-3 rounded-lg">
+          <p className="text-xs text-gray-600 mb-1">Total Lost Opportunities</p>
+          <p className="text-lg font-semibold text-red-600">{data.total_lost}</p>
         </div>
-        <div className="bg-red-50 p-4 rounded-lg">
-          <p className="text-sm text-gray-600">Total Value Lost</p>
-          <p className="text-xl font-semibold text-red-600">
+        <div className="bg-red-50 p-3 rounded-lg">
+          <p className="text-xs text-gray-600 mb-1">Total Value Lost</p>
+          <p className="text-lg font-semibold text-red-600">
             ${data.total_value_lost?.toLocaleString(undefined, {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2
             })}
           </p>
         </div>
-        <div className="bg-red-50 p-4 rounded-lg">
-          <p className="text-sm text-gray-600">Avg. Sales Cycle</p>
-          <p className="text-xl font-semibold text-red-600">
+        <div className="bg-red-50 p-3 rounded-lg">
+          <p className="text-xs text-gray-600 mb-1">Average Value</p>
+          <p className="text-lg font-semibold text-red-600">
+            ${data.avg_value_lost?.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
+            })}
+          </p>
+        </div>
+        <div className="bg-red-50 p-3 rounded-lg">
+          <p className="text-xs text-gray-600 mb-1">Avg. Sales Cycle</p>
+          <p className="text-lg font-semibold text-red-600">
             {Math.round(data.avg_cycle_length || 0)} days
           </p>
         </div>

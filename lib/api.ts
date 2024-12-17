@@ -1,4 +1,8 @@
-export async function analyzeFile(file: File, dateRange: string = 'all'): Promise<any> {
+import { AnalysisResults } from '@/types/analysis'
+
+export type { AnalysisResults }
+
+export async function analyzeFile(file: File, dateRange: string = 'all'): Promise<AnalysisResults> {
   const formData = new FormData()
   formData.append('file', file)
 
