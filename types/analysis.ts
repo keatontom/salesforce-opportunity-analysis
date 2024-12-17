@@ -40,6 +40,35 @@ export interface PipelineHealth {
   };
 }
 
+export interface OpenOpportunityTableRow {
+  Opportunity: string;
+  Account: string;
+  Stage: string;
+  Score: string;
+  Risk: string;
+  Value: string;
+  "Days Open": number;
+  "Key Insights": string;
+}
+
+export interface OpenOpportunityAnalysis {
+  has_data: boolean;
+  message?: string;
+  total_opportunities?: number;
+  total_value?: number;
+  average_score?: number;
+  summary_insights?: Array<{
+    category: string;
+    finding: string;
+    severity: 'high' | 'medium' | 'low';
+  }>;
+  opportunity_table?: {
+    headers: string[];
+    rows: OpenOpportunityTableRow[];
+  };
+  scoring_factors?: Record<string, number>;
+}
+
 export interface Visualization {
   data: string;
   config: {
@@ -82,6 +111,7 @@ export interface AnalysisResults {
         severity: 'high' | 'medium' | 'low';
       }>;
     };
+    "Score Open Opportunities": OpenOpportunityAnalysis;
   };
   "Visualizations": {
     "Win Rates by Type": Visualization;

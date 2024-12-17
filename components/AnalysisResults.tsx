@@ -8,7 +8,8 @@ import dynamic from 'next/dynamic'
 import AgingOpportunitiesTable from './analysis/AgingOpportunitiesTable'
 import TrendAnalysis from './analysis/TrendAnalysis'
 import LossAnalysis from './analysis/LossAnalysis'
-import WinAnalysis from '../components/analysis/WinAnalysis'
+import WinAnalysis from './analysis/WinAnalysis'
+import OpenOpportunityAnalysis from './analysis/OpenOpportunityAnalysis'
 
 // Dynamically import Plotly charts to avoid SSR issues
 const Plot = dynamic(() => import('react-plotly.js').then(mod => mod.default), { ssr: false })
@@ -78,12 +79,17 @@ export default function AnalysisResults({ results, onDateRangeChange }: Analysis
         
         <div>
           <h2 className="text-xl font-semibold mb-4">Analysis by Stage</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <WinAnalysis 
-              data={results["Advanced Analysis"]["Win Analysis"]}
-            />
-            <LossAnalysis 
-              data={results["Advanced Analysis"]["Loss Analysis"]}
+          <div className="grid grid-cols-1 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <WinAnalysis 
+                data={results["Advanced Analysis"]["Win Analysis"]}
+              />
+              <LossAnalysis 
+                data={results["Advanced Analysis"]["Loss Analysis"]}
+              />
+            </div>
+            <OpenOpportunityAnalysis 
+              data={results["Advanced Analysis"]["Score Open Opportunities"]}
             />
           </div>
         </div>
