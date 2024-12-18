@@ -600,7 +600,7 @@ class SalesOpportunityAnalyzer:
     def score_open_opportunities(self) -> Dict[str, Any]:
         """
         Score open opportunities based on historical win/loss patterns
-        Returns a detailed analysis of each open opportunity with scoring and recommendations
+        Score represents the average of win rates across all matching fields
         """
         # Get open opportunities (not Won or Lost)
         open_opps = self.data[~self.data['Stage'].isin(['Won', 'Lost'])].copy()
@@ -608,175 +608,191 @@ class SalesOpportunityAnalyzer:
         if len(open_opps) == 0:
             return {"message": "No open opportunities to analyze", "has_data": False}
             
-        # Get historical data for pattern analysis
-        won_opps = self.data[self.data['Stage'] == 'Won']
-        lost_opps = self.data[self.data['Stage'] == 'Lost']
+        # Get historical data (closed opportunities)
+        closed_opps = self.data[self.data['Stage'].isin(['Won', 'Lost'])].copy()
         
-        # Calculate base metrics from historical data
-        total_historical = len(won_opps) + len(lost_opps)
-        if total_historical == 0:
+        if len(closed_opps) == 0:
             return {"message": "No historical data available for analysis", "has_data": False}
             
-        # Add Size Category to the entire dataset
+        # Calculate base win rate
+        base_win_rate = len(closed_opps[closed_opps['Stage'] == 'Won']) / len(closed_opps)
+        
+        # Define size categories
         size_bins = [0, 50, 200, 500, float('inf')]
         size_labels = ['Small', 'Medium', 'Large', 'Enterprise']
-        self.data['Size Category'] = pd.cut(self.data['NumofLawyers'], bins=size_bins, labels=size_labels)
-            
-        # Calculate success rates for different factors
-        def calculate_success_rate(data, column, value):
-            relevant_data = data[data[column] == value]
-            if len(relevant_data) == 0:
-                return 0.5  # Neutral score when no historical data
-            won_count = len(relevant_data[relevant_data['Stage'] == 'Won'])
-            return won_count / len(relevant_data)
-            
-        # Initialize scoring factors and weights
-        scoring_factors = {
-            'practice_area': 0.25,
-            'firm_size': 0.20,
-            'opportunity_type': 0.20,
-            'campaign_source': 0.15,
-            'cycle_length': 0.10,
-            'deal_size': 0.10
-        }
         
         # Process each open opportunity
         scored_opportunities = []
         table_rows = []
         
         for _, opp in open_opps.iterrows():
-            scores = {}
+            field_scores = []
+            score_details = {}
             insights = []
             
-            # 1. Practice Area Score
+            # 1. Practice Area
             if pd.notna(opp['Law Firm Practice Area']):
                 practice_areas = [area.strip() for area in str(opp['Law Firm Practice Area']).split(';')]
-                practice_scores = []
+                practice_win_rates = []
+                
                 for area in practice_areas:
-                    success_rate = calculate_success_rate(self.data, 'Law Firm Practice Area', area)
-                    practice_scores.append(success_rate)
-                scores['practice_area'] = np.mean(practice_scores) if practice_scores else 0.5
-                if scores['practice_area'] > 0.7:
-                    insights.append(f"Strong historical performance in {', '.join(practice_areas)}")
-                elif scores['practice_area'] < 0.3:
-                    insights.append(f"Historically challenging practice area(s): {', '.join(practice_areas)}")
+                    area_opps = closed_opps[closed_opps['Law Firm Practice Area'].fillna('').str.contains(area, na=False)]
+                    if len(area_opps) > 0:
+                        area_win_rate = len(area_opps[area_opps['Stage'] == 'Won']) / len(area_opps)
+                        practice_win_rates.append(area_win_rate)
+                
+                if practice_win_rates:
+                    practice_score = np.mean(practice_win_rates) * 100
+                    field_scores.append(practice_score)
+                    score_details['practice_area'] = [
+                        f"{', '.join(practice_areas)}: {practice_score:.1f}% average win rate across practice areas"
+                    ]
             
-            # 2. Firm Size Score
+            # 2. Firm Size
             if pd.notna(opp['NumofLawyers']):
-                size_category = pd.cut([opp['NumofLawyers']], bins=size_bins, labels=size_labels)[0]
-                if pd.notna(size_category):  # Check if size_category is valid
-                    scores['firm_size'] = calculate_success_rate(self.data, 'Size Category', size_category)
-                    if scores['firm_size'] > 0.7:
-                        insights.append(f"Favorable firm size category: {size_category}")
-                    elif scores['firm_size'] < 0.3:
-                        insights.append(f"Challenging firm size category: {size_category}")
-                else:
-                    scores['firm_size'] = 0.5  # Neutral score for invalid size category
+                opp_size = pd.cut([opp['NumofLawyers']], bins=size_bins, labels=size_labels)[0]
+                if pd.notna(opp_size):
+                    size_opps = closed_opps[pd.cut(closed_opps['NumofLawyers'], bins=size_bins, labels=size_labels) == opp_size]
+                    if len(size_opps) > 0:
+                        size_win_rate = len(size_opps[size_opps['Stage'] == 'Won']) / len(size_opps) * 100
+                        field_scores.append(size_win_rate)
+                        score_details['firm_size'] = [
+                            f"{opp_size} firms: {size_win_rate:.1f}% win rate"
+                        ]
             
-            # 3. Opportunity Type Score
+            # 3. Opportunity Type
             if pd.notna(opp['Type']):
-                scores['opportunity_type'] = calculate_success_rate(self.data, 'Type', opp['Type'])
-                if scores['opportunity_type'] > 0.7:
-                    insights.append(f"High-performing opportunity type: {opp['Type']}")
-                elif scores['opportunity_type'] < 0.3:
-                    insights.append(f"Historically challenging opportunity type: {opp['Type']}")
+                type_opps = closed_opps[closed_opps['Type'] == opp['Type']]
+                if len(type_opps) > 0:
+                    type_win_rate = len(type_opps[type_opps['Stage'] == 'Won']) / len(type_opps) * 100
+                    field_scores.append(type_win_rate)
+                    score_details['opportunity_type'] = [
+                        f"{opp['Type']}: {type_win_rate:.1f}% win rate"
+                    ]
             
-            # 4. Campaign Source Score
+            # 4. Campaign Source
             if pd.notna(opp['Primary Campaign Source']):
-                scores['campaign_source'] = calculate_success_rate(self.data, 'Primary Campaign Source', opp['Primary Campaign Source'])
-                if scores['campaign_source'] > 0.7:
-                    insights.append("Strong campaign source performance")
-                elif scores['campaign_source'] < 0.3:
-                    insights.append("Campaign source has lower historical success rate")
+                campaign_opps = closed_opps[closed_opps['Primary Campaign Source'] == opp['Primary Campaign Source']]
+                if len(campaign_opps) > 0:
+                    campaign_win_rate = len(campaign_opps[campaign_opps['Stage'] == 'Won']) / len(campaign_opps) * 100
+                    field_scores.append(campaign_win_rate)
+                    score_details['campaign_source'] = [
+                        f"{opp['Primary Campaign Source']}: {campaign_win_rate:.1f}% win rate"
+                    ]
             
-            # 5. Cycle Length Score
-            current_cycle_length = (datetime.now() - pd.to_datetime(opp['Created Date'])).days
-            avg_won_cycle = won_opps['Time_To_Close'].mean()
-            avg_lost_cycle = lost_opps['Time_To_Close'].mean()
+            # 5. Deal Size (similar value range)
+            if pd.notna(opp['Total ACV']):
+                value_range = (0.8 * opp['Total ACV'], 1.2 * opp['Total ACV'])
+                value_opps = closed_opps[
+                    (closed_opps['Total ACV'] >= value_range[0]) & 
+                    (closed_opps['Total ACV'] <= value_range[1])
+                ]
+                if len(value_opps) > 0:
+                    value_win_rate = len(value_opps[value_opps['Stage'] == 'Won']) / len(value_opps) * 100
+                    field_scores.append(value_win_rate)
+                    avg_won_value = closed_opps[closed_opps['Stage'] == 'Won']['Total ACV'].mean()
+                    value_ratio = opp['Total ACV'] / avg_won_value
+                    score_details['deal_size'] = [
+                        f"Similar deal sizes: {value_win_rate:.1f}% win rate (Deal value is {value_ratio*100:.1f}% of average)"
+                    ]
             
-            if pd.notna(avg_won_cycle) and pd.notna(avg_lost_cycle):
-                if current_cycle_length > avg_lost_cycle:
-                    scores['cycle_length'] = 0.2
-                    insights.append("Opportunity is aging beyond typical lost deal timeframe")
-                elif current_cycle_length < avg_won_cycle:
-                    scores['cycle_length'] = 0.8
-                    insights.append("Opportunity is progressing within optimal timeframe")
-                else:
-                    scores['cycle_length'] = 0.5
+            # Calculate final score as average of field scores
+            if field_scores:
+                final_score = round(np.mean(field_scores), 2)
+            else:
+                final_score = round(base_win_rate * 100, 2)
             
-            # 6. Deal Size Score
-            avg_won_value = won_opps['Total ACV'].mean()
-            if pd.notna(avg_won_value) and pd.notna(opp['Total ACV']):
-                value_ratio = opp['Total ACV'] / avg_won_value
-                scores['deal_size'] = min(1.0, max(0.0, (1.0 if value_ratio > 0.5 else value_ratio)))
-                if scores['deal_size'] > 0.7:
-                    insights.append("Deal size aligns well with successful opportunities")
-                elif scores['deal_size'] < 0.3:
-                    insights.append("Deal size is significantly below successful average")
-            
-            # Calculate weighted score
-            weighted_score = 0
-            valid_weights_sum = 0
-            
-            for factor, weight in scoring_factors.items():
-                if factor in scores:
-                    weighted_score += scores[factor] * weight
-                    valid_weights_sum += weight
-            
-            final_score = round((weighted_score / valid_weights_sum) * 100, 2) if valid_weights_sum > 0 else 50.0
-            
-            # Determine risk level
+            # Determine risk level based on win probability
             risk_level = "Low" if final_score >= 70 else "Medium" if final_score >= 40 else "High"
             
-            # Format scores for table display
-            detailed_scores = {k: round(v * 100, 2) for k, v in scores.items()}
+            # Add insights for each field
+            insights = []
+            
+            # Add all calculated percentages with sample sizes
+            if 'practice_area' in score_details:
+                total_wins = 0
+                total_opps = 0
+                practice_areas_list = []
+                for area in practice_areas:
+                    area_opps = closed_opps[closed_opps['Law Firm Practice Area'].fillna('').str.contains(area, na=False)]
+                    if len(area_opps) > 0:
+                        total_wins += len(area_opps[area_opps['Stage'] == 'Won'])
+                        total_opps += len(area_opps)
+                        practice_areas_list.append(area)
+                
+                if total_opps > 0:
+                    combined_win_rate = (total_wins / total_opps) * 100
+                    insights.append(f"Practice Areas ({', '.join(practice_areas_list)}): {combined_win_rate:.1f}% win rate ({total_wins}/{total_opps} opportunities)")
+
+            if 'firm_size' in score_details:
+                size_opps = closed_opps[pd.cut(closed_opps['NumofLawyers'], bins=size_bins, labels=size_labels) == opp_size]
+                if len(size_opps) > 0:
+                    wins = len(size_opps[size_opps['Stage'] == 'Won'])
+                    total = len(size_opps)
+                    insights.append(f"Firm Size ({opp_size}): {size_win_rate:.1f}% win rate ({wins}/{total} opportunities)")
+
+            if 'opportunity_type' in score_details:
+                type_opps = closed_opps[closed_opps['Type'] == opp['Type']]
+                if len(type_opps) > 0:
+                    wins = len(type_opps[type_opps['Stage'] == 'Won'])
+                    total = len(type_opps)
+                    insights.append(f"Opportunity Type ({opp['Type']}): {type_win_rate:.1f}% win rate ({wins}/{total} opportunities)")
+
+            if 'campaign_source' in score_details:
+                campaign_opps = closed_opps[closed_opps['Primary Campaign Source'] == opp['Primary Campaign Source']]
+                if len(campaign_opps) > 0:
+                    wins = len(campaign_opps[campaign_opps['Stage'] == 'Won'])
+                    total = len(campaign_opps)
+                    insights.append(f"Campaign Source ({opp['Primary Campaign Source']}): {campaign_win_rate:.1f}% win rate ({wins}/{total} opportunities)")
+
+            if 'deal_size' in score_details:
+                value_opps = closed_opps[
+                    (closed_opps['Total ACV'] >= value_range[0]) & 
+                    (closed_opps['Total ACV'] <= value_range[1])
+                ]
+                if len(value_opps) > 0:
+                    wins = len(value_opps[value_opps['Stage'] == 'Won'])
+                    total = len(value_opps)
+                    insights.append(f"Similar Deal Size (${value_range[0]:,.2f} - ${value_range[1]:,.2f}): {value_win_rate:.1f}% win rate ({wins}/{total} opportunities)")
+            
+            # Add final score insight
+            fields_used = len(field_scores)
+            insights.append(f"Final Score: {final_score:.1f}% based on average of {fields_used} criteria")
             
             # Create table row
             table_row = {
                 "Opportunity": opp['Opportunity Name'],
-                "Account": opp['Account Name'],
-                "Stage": opp['Stage'],
                 "Score": f"{final_score}%",
                 "Risk": risk_level,
                 "Value": f"${opp['Total ACV']:,.2f}",
-                "Days Open": current_cycle_length,
-                "Key Insights": "; ".join(insights[:2])  # Show top 2 insights
+                "Days Open": (datetime.now() - pd.to_datetime(opp['Created Date'])).days,
+                "Score Details": {
+                    factor: {
+                        "score": "N/A",  # No individual scores in simplified version
+                        "weight": "N/A",  # No weights in simplified version
+                        "details": details
+                    }
+                    for factor, details in score_details.items()
+                },
+                "Key Insights": "\n".join(insights)  # Show all insights on separate lines
             }
             table_rows.append(table_row)
             
             # Add to scored opportunities
             scored_opportunities.append({
                 "opportunity_name": opp['Opportunity Name'],
-                "account_name": opp['Account Name'],
                 "score": final_score,
                 "risk_level": risk_level,
                 "total_value": opp['Total ACV'],
-                "current_stage": opp['Stage'],
-                "days_open": current_cycle_length,
-                "insights": insights,
-                "detailed_scores": detailed_scores
+                "days_open": (datetime.now() - pd.to_datetime(opp['Created Date'])).days,
+                "score_details": score_details,
+                "factor_scores": {"similar_opportunities": final_score},  # Simplified to single score
+                "insights": insights
             })
         
         # Sort opportunities by score (descending)
         scored_opportunities.sort(key=lambda x: x['score'], reverse=True)
         table_rows.sort(key=lambda x: float(x['Score'].rstrip('%')), reverse=True)
-        
-        # Create summary insights
-        high_risk_count = sum(1 for opp in scored_opportunities if opp['risk_level'] == "High")
-        high_value_opps = sum(1 for opp in scored_opportunities if opp['total_value'] > avg_won_value)
-        
-        summary_insights = [
-            {
-                "category": "Risk Distribution",
-                "finding": f"There are {high_risk_count} high-risk opportunities that need immediate attention",
-                "severity": "high" if high_risk_count > len(scored_opportunities) * 0.3 else "medium"
-            },
-            {
-                "category": "Value Distribution",
-                "finding": f"There are {high_value_opps} opportunities above the average won deal value (${avg_won_value:,.2f})",
-                "severity": "medium"
-            }
-        ]
         
         return {
             "has_data": True,
@@ -784,10 +800,9 @@ class SalesOpportunityAnalyzer:
             "total_value": sum(opp['total_value'] for opp in scored_opportunities),
             "average_score": round(np.mean([opp['score'] for opp in scored_opportunities]), 2),
             "opportunities": scored_opportunities,
-            "scoring_factors": scoring_factors,
-            "summary_insights": summary_insights,
+            "scoring_factors": {"similar_opportunities": 1.0},  # Simplified to single factor
             "opportunity_table": {
-                "headers": ["Opportunity", "Account", "Stage", "Score", "Risk", "Value", "Days Open", "Key Insights"],
+                "headers": ["Opportunity", "Score", "Risk", "Value", "Days Open", "Key Insights"],
                 "rows": table_rows
             }
         }
