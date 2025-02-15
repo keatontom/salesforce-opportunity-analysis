@@ -1,8 +1,7 @@
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objs as go
-from typing import Dict, Any
-from .analysis import SalesOpportunityAnalyzer
+from typing import Dict, Any, Tuple
+from analysis import SalesOpportunityAnalyzer
 
 class SalesVisualization:
     def __init__(self, data: pd.DataFrame):
@@ -10,13 +9,18 @@ class SalesVisualization:
         self.layout_template = {
             'margin': {'t': 30, 'l': 40, 'r': 40, 'b': 40},
             'font': {'size': 10},
-            'showlegend': True
+            'showlegend': True,
+            'height': 300,
+            'dragmode': False,  # Disable drag interactions
+        }
+        self.plot_config = {
+            'displayModeBar': False,
+            'staticPlot': False,
+            'responsive': True
         }
     
-    def win_rate_by_type(self) -> tuple[str | None, dict[str, bool]]:
-        """
-        Generate win rate visualization by Type
-        """
+    def win_rate_by_type(self) -> Tuple[str, Dict[str, bool]]:
+        """Generate win rate visualization by Type"""
         type_win_rates = self.data.groupby('Type').agg({
             'Stage': lambda x: (x == 'Won').mean(),
             'Total ACV': 'sum'
@@ -34,36 +38,29 @@ class SalesVisualization:
             **self.layout_template,
             yaxis_tickformat=',.0%',
             yaxis_title='Win Rate',
-            xaxis_title='Type',
-            dragmode=False,  # Disable drag interactions
+            xaxis_title='Type'
         )
         
-        # Return with config to remove modebar and disable all interactions
+        # Return with config to disable all interactions
         return fig.to_json(), {
-            'displayModeBar': False,  # Hide the modebar completely
-            'staticPlot': True,       # Make the plot static (no interactions)
-            'responsive': True        # Keep the plot responsive to container size
+            'displayModeBar': False,
+            'staticPlot': True,
+            'responsive': True
         }
     
-    def trend_analysis(self) -> Dict[str, Any]:
-        """
-        Create trend visualizations
-        """
+    def trend_analysis(self) -> Dict[str, Dict[str, Any]]:
+        """Create trend visualizations for win rate and volume"""
         df = self.data.copy()
         df['Created Date'] = pd.to_datetime(df['Created Date'])
         df.set_index('Created Date', inplace=True)
         
         # Determine the resampling frequency based on date range
         date_range = df.index.max() - df.index.min()
-        if date_range.days > 730:  # More than 2 years
-            freq = 'Y'
-            date_format = '%Y'
-        elif date_range.days > 365:  # More than 1 year
-            freq = '6M'
-            date_format = '%b %Y'
-        else:
-            freq = 'M'
-            date_format = '%b %Y'
+        freq, date_format = (
+            ('Y', '%Y') if date_range.days > 730    # More than 2 years
+            else ('6M', '%b %Y') if date_range.days > 365  # More than 1 year
+            else ('M', '%b %Y')
+        )
         
         # Resample and aggregate data
         monthly_data = df.resample(freq).agg({
@@ -100,12 +97,11 @@ class SalesVisualization:
                 ticktext=dates,
                 tickvals=dates
             ),
-            'height': 300,
-            'margin': dict(b=100, r=40),  # Increased bottom margin
+            'margin': dict(b=100, r=40),
             'legend': dict(
                 orientation="h",
                 yanchor="bottom",
-                y=-1,  # Moved down from -0.4 to -0.5
+                y=-1,
                 xanchor="center",
                 x=0.5
             )
@@ -150,12 +146,11 @@ class SalesVisualization:
                 ticktext=dates,
                 tickvals=dates
             ),
-            'height': 300,
-            'margin': dict(b=100, r=40),  # Increased bottom margin
+            'margin': dict(b=100, r=40),
             'legend': dict(
                 orientation="h",
                 yanchor="bottom",
-                y=-1,  # Moved down from -0.4 to -0.5
+                y=-1,
                 xanchor="center",
                 x=0.5
             )
@@ -168,22 +163,14 @@ class SalesVisualization:
         }
 
 def generate_visualizations(file_path: str, date_range: str = 'all') -> Dict[str, Any]:
-    """
-    Generate all visualizations with date filtering
-    """
+    """Generate all visualizations with date filtering"""
     data = pd.read_csv(file_path)
     analyzer = SalesOpportunityAnalyzer(data, date_range)  # This will apply the date filter
-    visualizer = SalesVisualization(analyzer.data)  # Pass the filtered data
+    visualizer = SalesVisualization(analyzer.data)
     
     # Get plot data and config
     win_rates_data, win_rates_config = visualizer.win_rate_by_type()
     trends_data = visualizer.trend_analysis()
-    
-    plot_config = {
-        'displayModeBar': False,
-        'staticPlot': False,
-        'responsive': True
-    }
     
     return {
         "Win Rates by Type": {
@@ -192,10 +179,10 @@ def generate_visualizations(file_path: str, date_range: str = 'all') -> Dict[str
         },
         "Win Rate Trend": {
             "data": trends_data['win_rate'],
-            "config": plot_config
+            "config": visualizer.plot_config
         },
         "Volume Trend": {
             "data": trends_data['volume'],
-            "config": plot_config
+            "config": visualizer.plot_config
         }
     }

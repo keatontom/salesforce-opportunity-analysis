@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
-from .services import comprehensive_report_analysis
+from services import comprehensive_report_analysis
 
 app = FastAPI()
 
@@ -15,6 +15,6 @@ app.add_middleware(
 @app.post("/api/analyze")
 async def analyze_file(
     file: UploadFile = File(...),
-    date_range: str = Query('all', enum=['all', 'last_quarter', 'last_year', 'ytd', 'last_30', 'last_90'])
+    date_range: str = Query('all', enum=['all', 'ytd', 'q1', 'q2', 'q3', 'q4'])
 ):
     return await comprehensive_report_analysis(file, date_range)

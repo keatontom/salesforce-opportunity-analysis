@@ -2,6 +2,12 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
+import logging
+import traceback
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class SalesOpportunityAnalyzer:
     def __init__(self, data: pd.DataFrame, date_range: str = 'all'):
@@ -21,10 +27,18 @@ class SalesOpportunityAnalyzer:
         - Law Firm Practice Area
         - NumofLawyers
         """
+        logger.info(f"Initializing analyzer with data shape: {data.shape}")
+        logger.info(f"Columns in data: {data.columns.tolist()}")
+        logger.info(f"Sample of data:\n{data.head()}")
+        
         self.data = data
         self.validate_columns()
         self.prepare_data()
         self.filter_by_date_range(date_range)
+        
+        logger.info(f"After initialization and filtering, data shape: {self.data.shape}")
+        logger.info(f"Unique stages: {self.data['Stage'].unique()}")
+        logger.info(f"Stage distribution:\n{self.data['Stage'].value_counts()}")
     
     def validate_columns(self):
         """
@@ -44,6 +58,11 @@ class SalesOpportunityAnalyzer:
             'NumofLawyers': 'float64'
         }
         
+        logger.info("Validating columns...")
+        missing_columns = [col for col in required_columns if col not in self.data.columns]
+        if missing_columns:
+            logger.warning(f"Missing columns: {missing_columns}")
+        
         # Add missing columns with default values
         for col, dtype in required_columns.items():
             if col not in self.data.columns:
@@ -53,74 +72,102 @@ class SalesOpportunityAnalyzer:
                     self.data[col] = 0.0
                 elif dtype.startswith('datetime'):
                     self.data[col] = pd.Timestamp.now()
-                print(f"Warning: Added missing column '{col}' with default values")
+                logger.warning(f"Added missing column '{col}' with default values")
+        
+        # Convert numeric columns
+        try:
+            self.data['Total ACV'] = pd.to_numeric(self.data['Total ACV'], errors='coerce').fillna(0)
+            self.data['NumofLawyers'] = pd.to_numeric(self.data['NumofLawyers'], errors='coerce').fillna(0)
+            logger.info("Numeric columns converted successfully")
+        except Exception as e:
+            logger.error(f"Error converting numeric columns: {str(e)}")
 
     def prepare_data(self):
         """
         Preprocess and transform the raw data
         """
+        logger.info("Starting data preparation")
         # Convert date columns, handling potential format issues
         for date_col in ['Created Date', 'Close Date']:
             try:
-                self.data[date_col] = pd.to_datetime(self.data[date_col]) # type: ignore
-            except:
-                print(f"Warning: Could not parse {date_col}, using current date")
+                self.data[date_col] = pd.to_datetime(self.data[date_col], errors='coerce')
+                logger.info(f"Converted {date_col} to datetime")
+            except Exception as e:
+                logger.error(f"Error converting {date_col}: {str(e)}")
+                logger.warning(f"Using current date for {date_col}")
                 self.data[date_col] = pd.Timestamp.now()
         
         # Calculate time to close
         self.data['Time_To_Close'] = (self.data['Close Date'] - self.data['Created Date']).dt.days
-        
+        logger.info("Calculated Time_To_Close")
+        logger.info(f"Data shape after preparation: {self.data.shape}")
+
     def filter_by_date_range(self, date_range: str):
         """
         Filter data based on date range
         """
+        logger.info(f"Filtering data by date range: {date_range}")
+        logger.info(f"Data shape before filtering: {self.data.shape}")
+        
         if date_range == 'all':
+            logger.info("Using all data (no date filtering)")
             return
-        
-        today = datetime.now()
-        current_year = today.year
-        
-        if date_range == 'last_year':
-            start_date = datetime(current_year - 1, 1, 1)
-            end_date = datetime(current_year - 1, 12, 31)
+            
+        try:
+            today = pd.Timestamp.now()
+            
+            if date_range == 'ytd':
+                start_date = today.replace(month=1, day=1)
+                end_date = today
+            elif date_range == 'q1':
+                start_date = today.replace(month=1, day=1)
+                end_date = today.replace(month=3, day=31)
+            elif date_range == 'q2':
+                start_date = today.replace(month=4, day=1)
+                end_date = today.replace(month=6, day=30)
+            elif date_range == 'q3':
+                start_date = today.replace(month=7, day=1)
+                end_date = today.replace(month=9, day=30)
+            elif date_range == 'q4':
+                start_date = today.replace(month=10, day=1)
+                end_date = today.replace(month=12, day=31)
+            else:
+                logger.warning(f"Unknown date range '{date_range}', using all data")
+                return
+                
+            logger.info(f"Filtering data from {start_date} to {end_date}")
             self.data = self.data[
                 (self.data['Created Date'] >= start_date) & 
                 (self.data['Created Date'] <= end_date)
             ]
-        elif date_range == 'ytd':
-            start_date = datetime(current_year, 1, 1)
-            self.data = self.data[self.data['Created Date'] >= start_date]
-        else:
-            # Handle quarters
-            quarter_map = {
-                'q1': (1, 3),
-                'q2': (4, 6),
-                'q3': (7, 9),
-                'q4': (10, 12)
-            }
-            if date_range in quarter_map:
-                start_month, end_month = quarter_map[date_range]
-                start_date = datetime(current_year, start_month, 1)
-                if end_month == 12:
-                    end_date = datetime(current_year, end_month, 31)
-                else:
-                    end_date = datetime(current_year, end_month + 1, 1) - timedelta(days=1)
-                
-                self.data = self.data[
-                    (self.data['Created Date'] >= start_date) & 
-                    (self.data['Created Date'] <= end_date)
-                ]
+            
+            logger.info(f"Data shape after filtering: {self.data.shape}")
+            logger.info(f"Date range of filtered data: {self.data['Created Date'].min()} to {self.data['Created Date'].max()}")
+            
+        except Exception as e:
+            logger.error(f"Error during date filtering: {str(e)}")
+            logger.error(traceback.format_exc())
+            # If there's an error in filtering, keep all data
+            logger.warning("Using all data due to filtering error")
     
     def calculate_core_metrics(self) -> Dict[str, Any]:
         """
         Calculate core sales metrics
         """
+        total_opportunities = len(self.data)
+        won_opportunities = len(self.data[self.data['Stage'] == 'Won'])
+        
+        # Prevent division by zero
+        win_rate = (won_opportunities / total_opportunities * 100) if total_opportunities > 0 else 0
+        avg_deal_size = self.data['Total ACV'].mean() if not self.data['Total ACV'].empty else 0
+        avg_time_to_close = self.data['Time_To_Close'].mean() if not self.data['Time_To_Close'].empty else 0
+        
         return {
             "Total Volume": round(self.data['Total ACV'].sum(), 2),
-            "Average Deal Size": round(self.data['Total ACV'].mean(), 2),
-            "Win Rate": round(len(self.data[self.data['Stage'] == 'Won']) / len(self.data) * 100, 2),
-            "Average Time to Close": round(self.data['Time_To_Close'].mean(), 2),
-            "Number of Opportunities": len(self.data)
+            "Average Deal Size": round(avg_deal_size, 2),
+            "Win Rate": round(win_rate, 2),
+            "Average Time to Close": round(avg_time_to_close, 2),
+            "Number of Opportunities": total_opportunities
         }
     
     def calculate_trends(self) -> Dict[str, Any]:
@@ -153,7 +200,7 @@ class SalesOpportunityAnalyzer:
         # Performance by Account
         account_performance = self.data.groupby('Account Name').agg({
             'Total ACV': ['sum', 'mean'],
-            'Stage': lambda x: (x == 'Won').mean() * 100  # Convert to percentage
+            'Stage': lambda x: (len(x[x == 'Won']) / len(x) * 100) if len(x) > 0 else 0  # Safe division
         }).reset_index()
         account_performance.columns = ['Account Name', 'Total Volume', 'Avg Deal Size', 'Win Rate']
         account_performance['Total Volume'] = account_performance['Total Volume'].round(2)
@@ -164,22 +211,20 @@ class SalesOpportunityAnalyzer:
         type_performance = []
         for type_name in self.data['Type'].unique():
             type_data = self.data[self.data['Type'] == type_name]
+            type_count = len(type_data)
             type_perf = {
                 'Type': type_name,
                 'Total Volume': round(type_data['Total ACV'].sum(), 2),
-                'Avg Deal Size': round(type_data['Total ACV'].mean(), 2),
-                'Win Rate': round(len(type_data[type_data['Stage'] == 'Won']) / len(type_data) * 100, 2),
+                'Avg Deal Size': round(type_data['Total ACV'].mean() if not type_data['Total ACV'].empty else 0, 2),
+                'Win Rate': round((len(type_data[type_data['Stage'] == 'Won']) / type_count * 100) if type_count > 0 else 0, 2),
                 'opportunities': type_data[[
                     'Account Name', 'Opportunity Name', 'Total ACV', 'Created Date', 'Type'
                 ]].to_dict(orient='records')
             }
             type_performance.append(type_perf)
         
-        # Performance by Practice Area - splitting semicolon-separated areas
-        # Handle missing or invalid values by excluding them
+        # Performance by Practice Area
         valid_areas = self.data['Law Firm Practice Area'].notna()
-        
-        # Create exploded dataframe only for valid practice areas
         practice_areas_exploded = pd.DataFrame({
             'Practice Area': self.data[valid_areas]['Law Firm Practice Area'].str.split(';').explode().str.strip(),
             'Total ACV': self.data[valid_areas]['Total ACV'].repeat(
@@ -197,10 +242,10 @@ class SalesOpportunityAnalyzer:
             (practice_areas_exploded['Practice Area'] != 'Unknown')
         ]
         
-        # Group by individual practice areas
+        # Group by individual practice areas with safe division
         practice_performance = practice_areas_exploded.groupby('Practice Area').agg({
             'Total ACV': ['sum', 'mean'],
-            'Stage': lambda x: (x == 'Won').mean() * 100  # Convert to percentage
+            'Stage': lambda x: (len(x[x == 'Won']) / len(x) * 100) if len(x) > 0 else 0  # Safe division
         }).reset_index()
         practice_performance.columns = ['Practice Area', 'Total Volume', 'Avg Deal Size', 'Win Rate']
         practice_performance['Total Volume'] = practice_performance['Total Volume'].round(2)
@@ -218,13 +263,14 @@ class SalesOpportunityAnalyzer:
         """
         Analyze the health of the sales pipeline
         """
+        total_opportunities = len(self.data)
         stage_distribution = {}
         for stage in self.data['Stage'].unique():
             stage_data = self.data[self.data['Stage'] == stage]
             count = len(stage_data)
             
             stage_distribution[stage] = {
-                'percentage': float(count / len(self.data)),
+                'percentage': float(count / total_opportunities) if total_opportunities > 0 else 0,
                 'count': int(count)
             }
         
@@ -235,7 +281,7 @@ class SalesOpportunityAnalyzer:
         aging_opportunities = self.data.copy()
         aging_opportunities['Created Date'] = pd.to_datetime(aging_opportunities['Created Date'], utc=True)
         current_time = pd.Timestamp.now(tz='UTC')
-        aging_opportunities['Days Open'] = (current_time - aging_opportunities['Created Date']).dt.days # type: ignore
+        aging_opportunities['Days Open'] = (current_time - aging_opportunities['Created Date']).dt.days
         
         aging_opportunities = aging_opportunities[
             (aging_opportunities['Stage'] != 'Won') & 
@@ -332,7 +378,7 @@ class SalesOpportunityAnalyzer:
         reason_stats = []
         for reason, count in lost_reasons.items():
             value = lost_opps[lost_opps['Closed Lost Reason'] == reason]['Total ACV'].sum()
-            loss_rate = (count/total_lost*100)
+            loss_rate = (count/total_lost*100) if total_lost > 0 else 0
             reason_stats.append({
                 'reason': reason,
                 'text': f"• {reason} ({loss_rate:.1f}%): {count} losses (${value:,.2f} total value)",
@@ -351,7 +397,7 @@ class SalesOpportunityAnalyzer:
             total_type = len(type_data)
             lost_type = len(type_data[type_data['Stage'] == 'Lost'])
             if total_type >= 5:  # Only include types with meaningful sample size
-                loss_rate = (lost_type / total_type) * 100
+                loss_rate = (lost_type / total_type * 100) if total_type > 0 else 0
                 lost_value = type_data[type_data['Stage'] == 'Lost']['Total ACV'].sum()
                 type_stats.append({
                     'type': type_name,
@@ -431,14 +477,14 @@ class SalesOpportunityAnalyzer:
 
         return {
             "has_data": True,
-            "total_lost": len(lost_opps),
+            "total_lost": total_lost,
             "total_value_lost": lost_opps['Total ACV'].sum(),
-            "avg_value_lost": lost_opps['Total ACV'].mean(),
-            "avg_cycle_length": int(round(lost_opps['Time_To_Close'].mean())),
+            "avg_value_lost": lost_opps['Total ACV'].mean() if not lost_opps['Total ACV'].empty else 0,
+            "avg_cycle_length": int(round(lost_opps['Time_To_Close'].mean())) if not lost_opps['Time_To_Close'].empty else 0,
             "insights": [
                 {
                     "category": "Practice Area Failures",
-                    "finding": "\n".join(practice_summary),
+                    "finding": "\n".join(practice_summary) if 'practice_summary' in locals() else "No practice area data available",
                     "severity": "high"
                 },
                 {
@@ -448,7 +494,7 @@ class SalesOpportunityAnalyzer:
                 },
                 {
                     "category": "Campaign Performance",
-                    "finding": "\n".join(campaign_text) if campaign_text else "No significant campaign data available",
+                    "finding": "\n".join(campaign_text) if 'campaign_text' in locals() and campaign_text else "No significant campaign data available",
                     "severity": "medium"
                 },
                 {
@@ -458,12 +504,35 @@ class SalesOpportunityAnalyzer:
                 },
                 {
                     "category": "Lawyer Count Distribution",
-                    "finding": "\n".join(size_summary),
+                    "finding": "\n".join(size_summary) if 'size_summary' in locals() else "No lawyer count data available",
                     "severity": "medium"
                 }
             ]
         }
     
+    @staticmethod
+    def categorize_campaign(campaign: str) -> str | None:
+        """Categorize campaign sources into standardized categories"""
+        if pd.isna(campaign) or str(campaign).lower().strip() in ['', 'unknown', 'other', 'none']:
+            return None
+        campaign = str(campaign).lower()
+        if 'email' in campaign or 'newsletter' in campaign:
+            return 'Email Campaigns'
+        elif 'demo' in campaign:
+            return 'Product Demos'
+        elif 'webinar' in campaign or 'event' in campaign:
+            return 'Events & Webinars'
+        elif 'referral' in campaign:
+            return 'Referrals'
+        elif 'partner' in campaign:
+            return 'Partner Programs'
+        elif 'social' in campaign:
+            return 'Social Media'
+        elif 'content' in campaign or 'blog' in campaign:
+            return 'Content Marketing'
+        else:
+            return campaign.title()
+
     def analyze_win_patterns(self) -> Dict[str, Any]:
         """
         Analyze patterns in won opportunities
@@ -476,7 +545,7 @@ class SalesOpportunityAnalyzer:
         # Calculate core metrics
         total_won = len(won_opps)
         total_value_won = won_opps['Total ACV'].sum()
-        avg_cycle_length = int(round(won_opps['Time_To_Close'].mean()))  # Rounded to nearest day
+        avg_cycle_length = int(round(won_opps['Time_To_Close'].mean())) if not won_opps['Time_To_Close'].empty else 0
 
         # Analyze by Firm Size
         size_bins = [0, 50, 200, 500, float('inf')]
@@ -505,7 +574,7 @@ class SalesOpportunityAnalyzer:
             total_type = len(type_data)
             won_type = len(type_data[type_data['Stage'] == 'Won'])
             if total_type >= 5:  # Only include types with meaningful sample size
-                win_rate = (won_type / total_type) * 100
+                win_rate = (won_type / total_type * 100) if total_type > 0 else 0
                 value = type_data[type_data['Stage'] == 'Won']['Total ACV'].sum()
                 type_stats.append({
                     'type': type_name,
@@ -519,34 +588,13 @@ class SalesOpportunityAnalyzer:
         type_summary = [item['text'] for item in type_stats]
 
         # Analyze Campaigns
-        def categorize_campaign(campaign):
-            if pd.isna(campaign) or str(campaign).lower().strip() in ['', 'unknown', 'other', 'none']:
-                return None
-            campaign = str(campaign).lower()
-            if 'email' in campaign or 'newsletter' in campaign:
-                return 'Email Campaigns'
-            elif 'demo' in campaign:
-                return 'Product Demos'
-            elif 'webinar' in campaign or 'event' in campaign:
-                return 'Events & Webinars'
-            elif 'referral' in campaign:
-                return 'Referrals'
-            elif 'partner' in campaign:
-                return 'Partner Programs'
-            elif 'social' in campaign:
-                return 'Social Media'
-            elif 'content' in campaign or 'blog' in campaign:
-                return 'Content Marketing'
-            else:
-                return campaign.title()
-
-        won_opps['Campaign Category'] = won_opps['Primary Campaign Source'].apply(categorize_campaign)
+        won_opps['Campaign Category'] = won_opps['Primary Campaign Source'].apply(self.categorize_campaign)
         won_opps_with_campaigns = won_opps[won_opps['Campaign Category'].notna()]
         campaign_stats = won_opps_with_campaigns.groupby('Campaign Category', observed=True).agg({
             'Opportunity Name': 'count',
             'Total ACV': 'sum'
         })
-        
+
         campaign_summary = []
         for campaign in campaign_stats.index:
             count = int(pd.to_numeric(campaign_stats.loc[campaign, 'Opportunity Name']))
@@ -565,7 +613,7 @@ class SalesOpportunityAnalyzer:
 
         # Sort by count and value and take top 3
         campaign_summary.sort(key=lambda x: (-x['count'], -x['value']))
-        campaign_text = [item['text'] for item in campaign_summary[:3]]  # Take top 3
+        campaign_text = [item['text'] for item in campaign_summary[:3]]
 
         return {
             "has_data": True,
@@ -576,7 +624,7 @@ class SalesOpportunityAnalyzer:
             "insights": [
                 {
                     "category": "Practice Area Successes",
-                    "finding": "\n".join(practice_summary),
+                    "finding": "\n".join(practice_summary) if practice_summary else "No practice area data available",
                     "severity": "high"
                 },
                 {
@@ -591,7 +639,7 @@ class SalesOpportunityAnalyzer:
                 },
                 {
                     "category": "Lawyer Count Distribution",
-                    "finding": "\n".join(size_summary),
+                    "finding": "\n".join(size_summary) if size_summary else "No lawyer count data available",
                     "severity": "medium"
                 }
             ]
@@ -615,7 +663,7 @@ class SalesOpportunityAnalyzer:
             return {"message": "No historical data available for analysis", "has_data": False}
             
         # Calculate base win rate
-        base_win_rate = len(closed_opps[closed_opps['Stage'] == 'Won']) / len(closed_opps)
+        base_win_rate = (len(closed_opps[closed_opps['Stage'] == 'Won']) / len(closed_opps)) if len(closed_opps) > 0 else 0
         
         # Define size categories
         size_bins = [0, 50, 200, 500, float('inf')]
@@ -638,7 +686,7 @@ class SalesOpportunityAnalyzer:
                 for area in practice_areas:
                     area_opps = closed_opps[closed_opps['Law Firm Practice Area'].fillna('').str.contains(area, na=False)]
                     if len(area_opps) > 0:
-                        area_win_rate = len(area_opps[area_opps['Stage'] == 'Won']) / len(area_opps)
+                        area_win_rate = (len(area_opps[area_opps['Stage'] == 'Won']) / len(area_opps)) if len(area_opps) > 0 else 0
                         practice_win_rates.append(area_win_rate)
                 
                 if practice_win_rates:
@@ -654,7 +702,7 @@ class SalesOpportunityAnalyzer:
                 if pd.notna(opp_size):
                     size_opps = closed_opps[pd.cut(closed_opps['NumofLawyers'], bins=size_bins, labels=size_labels) == opp_size]
                     if len(size_opps) > 0:
-                        size_win_rate = len(size_opps[size_opps['Stage'] == 'Won']) / len(size_opps) * 100
+                        size_win_rate = (len(size_opps[size_opps['Stage'] == 'Won']) / len(size_opps) * 100) if len(size_opps) > 0 else 0
                         field_scores.append(size_win_rate)
                         score_details['firm_size'] = [
                             f"{opp_size} firms: {size_win_rate:.1f}% win rate"
@@ -664,7 +712,7 @@ class SalesOpportunityAnalyzer:
             if pd.notna(opp['Type']):
                 type_opps = closed_opps[closed_opps['Type'] == opp['Type']]
                 if len(type_opps) > 0:
-                    type_win_rate = len(type_opps[type_opps['Stage'] == 'Won']) / len(type_opps) * 100
+                    type_win_rate = (len(type_opps[type_opps['Stage'] == 'Won']) / len(type_opps) * 100) if len(type_opps) > 0 else 0
                     field_scores.append(type_win_rate)
                     score_details['opportunity_type'] = [
                         f"{opp['Type']}: {type_win_rate:.1f}% win rate"
@@ -674,7 +722,7 @@ class SalesOpportunityAnalyzer:
             if pd.notna(opp['Primary Campaign Source']):
                 campaign_opps = closed_opps[closed_opps['Primary Campaign Source'] == opp['Primary Campaign Source']]
                 if len(campaign_opps) > 0:
-                    campaign_win_rate = len(campaign_opps[campaign_opps['Stage'] == 'Won']) / len(campaign_opps) * 100
+                    campaign_win_rate = (len(campaign_opps[campaign_opps['Stage'] == 'Won']) / len(campaign_opps) * 100) if len(campaign_opps) > 0 else 0
                     field_scores.append(campaign_win_rate)
                     score_details['campaign_source'] = [
                         f"{opp['Primary Campaign Source']}: {campaign_win_rate:.1f}% win rate"
@@ -688,10 +736,10 @@ class SalesOpportunityAnalyzer:
                     (closed_opps['Total ACV'] <= value_range[1])
                 ]
                 if len(value_opps) > 0:
-                    value_win_rate = len(value_opps[value_opps['Stage'] == 'Won']) / len(value_opps) * 100
+                    value_win_rate = (len(value_opps[value_opps['Stage'] == 'Won']) / len(value_opps) * 100) if len(value_opps) > 0 else 0
                     field_scores.append(value_win_rate)
-                    avg_won_value = closed_opps[closed_opps['Stage'] == 'Won']['Total ACV'].mean()
-                    value_ratio = opp['Total ACV'] / avg_won_value
+                    avg_won_value = closed_opps[closed_opps['Stage'] == 'Won']['Total ACV'].mean() if not closed_opps[closed_opps['Stage'] == 'Won']['Total ACV'].empty else 0
+                    value_ratio = (opp['Total ACV'] / avg_won_value) if avg_won_value > 0 else 1
                     score_details['deal_size'] = [
                         f"Similar deal sizes: {value_win_rate:.1f}% win rate (Deal value is {value_ratio*100:.1f}% of average)"
                     ]
@@ -721,7 +769,7 @@ class SalesOpportunityAnalyzer:
                         practice_areas_list.append(area)
                 
                 if total_opps > 0:
-                    combined_win_rate = (total_wins / total_opps) * 100
+                    combined_win_rate = (total_wins / total_opps) * 100 if total_opps > 0 else 0
                     insights.append(f"Practice Areas ({', '.join(practice_areas_list)}): {combined_win_rate:.1f}% win rate ({total_wins}/{total_opps} opportunities)")
 
             if 'firm_size' in score_details:
@@ -798,7 +846,7 @@ class SalesOpportunityAnalyzer:
             "has_data": True,
             "total_opportunities": len(scored_opportunities),
             "total_value": sum(opp['total_value'] for opp in scored_opportunities),
-            "average_score": round(np.mean([opp['score'] for opp in scored_opportunities]), 2),
+            "average_score": round(np.mean([opp['score'] for opp in scored_opportunities]), 2) if scored_opportunities else 0,
             "opportunities": scored_opportunities,
             "scoring_factors": {"similar_opportunities": 1.0},  # Simplified to single factor
             "opportunity_table": {
@@ -811,14 +859,58 @@ def analyze_opportunities(file_path: str, date_range: str = 'all') -> Dict[str, 
     """
     Main analysis function to process sales opportunity data
     """
-    data = pd.read_csv(file_path)
-    analyzer = SalesOpportunityAnalyzer(data, date_range)
-    
-    return {
-        "Core Metrics": analyzer.calculate_core_metrics(),
-        "Segment Performance": analyzer.segment_performance(),
-        "Pipeline Health": analyzer.pipeline_health_analysis(),
-        "Loss Analysis": analyzer.analyze_loss_patterns(),
-        "Win Analysis": analyzer.analyze_win_patterns(),
-        "Score Open Opportunities": analyzer.score_open_opportunities()
-    }
+    logger.info(f"Starting to read CSV file: {file_path}")
+    try:
+        data = pd.read_csv(file_path)
+        logger.info(f"Successfully read CSV file with {len(data)} rows and {len(data.columns)} columns")
+        logger.info(f"Columns in CSV: {data.columns.tolist()}")
+        logger.info(f"Data types:\n{data.dtypes}")
+        logger.info(f"Sample of data:\n{data.head()}")
+        
+        if data.empty:
+            logger.error("CSV file is empty")
+            raise ValueError("The uploaded CSV file is empty")
+            
+    except pd.errors.EmptyDataError:
+        logger.error("CSV file is empty")
+        raise ValueError("The uploaded CSV file is empty")
+    except Exception as e:
+        logger.error(f"Error reading CSV file: {str(e)}")
+        raise
+
+    try:
+        logger.info("Initializing SalesOpportunityAnalyzer")
+        analyzer = SalesOpportunityAnalyzer(data, date_range)
+        
+        logger.info("Calculating core metrics")
+        core_metrics = analyzer.calculate_core_metrics()
+        logger.info(f"Core metrics calculated: {core_metrics}")
+        
+        logger.info("Analyzing segment performance")
+        segment_performance = analyzer.segment_performance()
+        
+        logger.info("Analyzing pipeline health")
+        pipeline_health = analyzer.pipeline_health_analysis()
+        
+        logger.info("Analyzing loss patterns")
+        loss_analysis = analyzer.analyze_loss_patterns()
+        
+        logger.info("Analyzing win patterns")
+        win_analysis = analyzer.analyze_win_patterns()
+        
+        logger.info("Scoring open opportunities")
+        open_opportunities = analyzer.score_open_opportunities()
+        
+        logger.info("Analysis completed successfully")
+        return {
+            "Core Metrics": core_metrics,
+            "Segment Performance": segment_performance,
+            "Pipeline Health": pipeline_health,
+            "Loss Analysis": loss_analysis,
+            "Win Analysis": win_analysis,
+            "Score Open Opportunities": open_opportunities
+        }
+    except Exception as e:
+        logger.error(f"Error during analysis: {str(e)}")
+        logger.error(f"Error traceback: {traceback.format_exc()}")
+        raise
