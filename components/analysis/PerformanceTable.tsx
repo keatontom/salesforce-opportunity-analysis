@@ -88,14 +88,14 @@ export default function PerformanceTable<T extends PerformanceRecord>({
                 ].map(({ field, label, width }) => (
                   <th 
                     key={field} 
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
                     style={{ width }}
                   >
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleSort(field as SortField)}
-                      className={`flex items-center gap-1 hover:text-blue-600 transition-colors ${
+                      className={`flex items-center gap-1 hover:text-blue-600 transition-colors ml-auto ${
                         sortField === field ? 'text-blue-600' : 'text-gray-500'
                       }`}
                     >
@@ -116,7 +116,7 @@ export default function PerformanceTable<T extends PerformanceRecord>({
                     {isRenderable(record[nameField]) ? record[nameField] : String(record[nameField])}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
-                          <span className="text-blue-600 font-medium">
+                    <span className="text-blue-600 font-medium">
                       ${record["Total Volume"].toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2

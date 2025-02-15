@@ -43,38 +43,38 @@ export default function WinAnalysis({ data }: WinAnalysisProps) {
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.01]">
+    <div className="bg-emerald-50 p-6 rounded-lg shadow-md border border-emerald-200 transition-all duration-200 hover:shadow-lg hover:scale-[1.01]">
       <div className="flex items-center gap-2 mb-4">
-        <TrendingUp className="h-6 w-6 text-green-500" />
-        <h3 className="text-xl font-semibold text-gray-800">Win Analysis</h3>
+        <TrendingUp className="h-6 w-6 text-emerald-600" />
+        <h3 className="text-xl font-semibold text-emerald-800">Win Analysis</h3>
       </div>
 
       <div className="grid grid-cols-4 gap-3 mb-6">
-        <div className="bg-green-50 p-3 rounded-lg">
-          <p className="text-xs text-gray-600 mb-1">Total Won Opportunities</p>
-          <p className="text-lg font-semibold text-green-600">{data.total_won}</p>
+        <div className="bg-white p-3 rounded-lg shadow-sm">
+          <p className="text-xs text-emerald-700 mb-1 font-medium">Total Won Opportunities</p>
+          <p className="text-lg font-semibold text-emerald-600">{data.total_won}</p>
         </div>
-        <div className="bg-green-50 p-3 rounded-lg">
-          <p className="text-xs text-gray-600 mb-1">Total Value Won</p>
-          <p className="text-lg font-semibold text-green-600">
+        <div className="bg-white p-3 rounded-lg shadow-sm">
+          <p className="text-xs text-emerald-700 mb-1 font-medium">Total Value Won</p>
+          <p className="text-lg font-semibold text-emerald-600">
             ${data.total_value_won?.toLocaleString(undefined, {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2
             })}
           </p>
         </div>
-        <div className="bg-green-50 p-3 rounded-lg">
-          <p className="text-xs text-gray-600 mb-1">Average Value</p>
-          <p className="text-lg font-semibold text-green-600">
+        <div className="bg-white p-3 rounded-lg shadow-sm">
+          <p className="text-xs text-emerald-700 mb-1 font-medium">Average Value</p>
+          <p className="text-lg font-semibold text-emerald-600">
             ${data.avg_value_won?.toLocaleString(undefined, {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2
             })}
           </p>
         </div>
-        <div className="bg-green-50 p-3 rounded-lg">
-          <p className="text-xs text-gray-600 mb-1">Avg. Sales Cycle</p>
-          <p className="text-lg font-semibold text-green-600">
+        <div className="bg-white p-3 rounded-lg shadow-sm">
+          <p className="text-xs text-emerald-700 mb-1 font-medium">Avg. Sales Cycle</p>
+          <p className="text-lg font-semibold text-emerald-600">
             {Math.round(data.avg_cycle_length || 0)} days
           </p>
         </div>
@@ -84,19 +84,15 @@ export default function WinAnalysis({ data }: WinAnalysisProps) {
         {data.insights?.map((insight, index) => (
           <div 
             key={index} 
-            className={`p-4 rounded-lg ${
-              insight.severity === 'high' 
-                ? 'bg-green-50 border border-green-100' 
-                : 'bg-emerald-50 border border-emerald-100'
-            }`}
+            className="p-4 rounded-lg bg-white shadow-sm"
           >
             <div className="flex items-start gap-3">
-              <div className="h-5 w-5 mt-0.5 flex-shrink-0 rounded-full bg-green-100 flex items-center justify-center">
-                <TrendingUp className="h-3 w-3 text-green-600" />
+              <div className="h-5 w-5 mt-0.5 flex-shrink-0 rounded-full bg-emerald-50 flex items-center justify-center">
+                <TrendingUp className="h-3 w-3 text-emerald-600" />
               </div>
               <div className="space-y-1 w-full">
-                <p className="font-medium text-gray-900">{insight.category}</p>
-                <div className="text-sm text-gray-600">
+                <p className="font-medium text-emerald-700">{insight.category}</p>
+                <div className="text-sm text-emerald-600">
                   {formatBulletPoints(insight.finding)}
                 </div>
               </div>

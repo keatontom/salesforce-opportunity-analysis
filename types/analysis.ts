@@ -7,10 +7,10 @@ export interface CoreMetrics {
 }
 
 export interface PerformanceRecord {
-  [key: string]: string | number | TypeOpportunity[];
   "Total Volume": number;
   "Avg Deal Size": number;
   "Win Rate": number;
+  [key: string]: any;
 }
 
 export interface TypePerformanceRecord extends PerformanceRecord {
@@ -42,8 +42,6 @@ export interface PipelineHealth {
 
 export interface OpenOpportunityTableRow {
   Opportunity: string;
-  Account: string;
-  Stage: string;
   Score: string;
   Risk: string;
   Value: string;
@@ -78,46 +76,75 @@ export interface Visualization {
   };
 }
 
+export interface Visualizations {
+  "Win Rate Trend": Visualization;
+  "Volume Trend": Visualization;
+  "Win Rates by Type": Visualization;
+}
+
+export interface SegmentPerformance {
+  "Type Performance": TypePerformanceRecord[];
+  "Practice Area Performance": PerformanceRecord[];
+  "Account Performance": PerformanceRecord[];
+}
+
+export interface StageAnalysis {
+  has_data: boolean;
+  message?: string;
+  total_value?: number;
+  avg_value?: number;
+  avg_cycle_length?: number;
+  insights?: Array<{
+    category: string;
+    finding: string;
+    severity: 'high' | 'medium' | 'low';
+  }>;
+}
+
+export interface WinAnalysis extends StageAnalysis {
+  total_won?: number;
+  total_value_won?: number;
+  avg_value_won?: number;
+}
+
+export interface LossAnalysis extends StageAnalysis {
+  total_lost?: number;
+  total_value_lost?: number;
+  avg_value_lost?: number;
+}
+
+export interface OpenOpportunityData {
+  has_data: boolean;
+  message?: string;
+  total_open?: number;
+  total_opportunities?: number;
+  total_value?: number;
+  total_pipeline_value?: number;
+  avg_value?: number;
+  average_value?: number;
+  average_score?: number;
+  avg_cycle_length?: number;
+  insights?: Array<{
+    category: string;
+    finding: string;
+    severity: 'high' | 'medium' | 'low';
+  }>;
+  opportunity_table?: {
+    headers: string[];
+    rows: OpenOpportunityTableRow[];
+  };
+}
+
 export interface AnalysisResults {
   "Advanced Analysis": {
     "Core Metrics": CoreMetrics;
-    "Segment Performance": {
-      "Account Performance": PerformanceRecord[];
-      "Type Performance": PerformanceRecord[];
-      "Practice Area Performance": PerformanceRecord[];
-    };
     "Pipeline Health": PipelineHealth;
-    "Loss Analysis": {
-      has_data: boolean;
-      message?: string;
-      total_lost?: number;
-      total_value_lost?: number;
-      avg_cycle_length?: number;
-      insights?: Array<{
-        category: string;
-        finding: string;
-        severity: 'high' | 'medium' | 'low';
-      }>;
-    };
-    "Win Analysis": {
-      has_data: boolean;
-      message?: string;
-      total_won?: number;
-      total_value_won?: number;
-      avg_cycle_length?: number;
-      insights?: Array<{
-        category: string;
-        finding: string;
-        severity: 'high' | 'medium' | 'low';
-      }>;
-    };
-    "Score Open Opportunities": OpenOpportunityAnalysis;
+    "Win Analysis": WinAnalysis;
+    "Loss Analysis": LossAnalysis;
+    "Score Open Opportunities": OpenOpportunityData;
+    "Segment Performance": SegmentPerformance;
   };
-  "Visualizations": {
-    "Win Rates by Type": Visualization;
-    "Win Rate Trend": Visualization;
-    "Volume Trend": Visualization;
-  };
+  "Visualizations": Visualizations;
 }
 
 export type DateRange = 'all' | 'q1' | 'q2' | 'q3' | 'q4' | 'ytd' | 'last_year'; 

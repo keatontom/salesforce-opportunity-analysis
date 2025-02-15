@@ -12,7 +12,7 @@ export default function Home() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisResults, setAnalysisResults] = useState<AnalysisResultsType | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [dateRange, setDateRange] = useState<DateRange>('ytd')
+  const [dateRange, setDateRange] = useState<DateRange>('all')
 
   const handleFileUpload = (uploadedFile: File) => {
     setFile(uploadedFile)
