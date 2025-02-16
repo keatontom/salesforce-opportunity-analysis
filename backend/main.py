@@ -4,13 +4,23 @@ from services import comprehensive_report_analysis
 
 app = FastAPI()
 
+origins = [
+    "https://v0-salesforce-opprtunity-kehsxnvvjsw.vercel.app/",  # Your Vercel frontend
+    "http://localhost:3000"  # Allow local development
+]
+
+# ✅ Add CORS settings
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=origins,  # Allow only frontend requests
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allow all methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
 )
+
+@app.get("/")
+def home():
+    return {"message": "Hello from FASTAPI on Fly.io"}
 
 @app.post("/api/analyze")
 async def analyze_file(
