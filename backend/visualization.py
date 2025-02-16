@@ -42,7 +42,7 @@ class SalesVisualization:
         )
         
         # Return with config to disable all interactions
-        return fig.to_json(), {
+        return fig.to_json(), { # type: ignore
             'displayModeBar': False,
             'staticPlot': True,
             'responsive': True
@@ -160,7 +160,7 @@ class SalesVisualization:
         return {
             'win_rate': win_rate_fig.to_json(),
             'volume': volume_fig.to_json()
-        }
+        } # type: ignore
 
 def generate_visualizations(file_path: str, date_range: str = 'all') -> Dict[str, Any]:
     """Generate all visualizations with date filtering"""

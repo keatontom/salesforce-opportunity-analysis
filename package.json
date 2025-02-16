@@ -15,12 +15,12 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
-    "next": "14.2.16",
+    "next": "^14.2.24",
     "plotly.js": "^2.35.3",
     "react": "^18",
     "react-dom": "^18",
     "react-plotly.js": "^2.6.0",
-    "tailwind-merge": "^2.5.5",
+    "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
