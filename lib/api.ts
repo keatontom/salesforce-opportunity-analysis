@@ -6,7 +6,7 @@ export async function analyzeFile(file: File, dateRange: string = 'all'): Promis
   const formData = new FormData()
   formData.append('file', file)
 
-  const response = await fetch(`http://localhost:8000/api/analyze?date_range=${dateRange}`, {
+  const response = await fetch(`https://salesforce-opportunity-analysis.fly.dev/api/analyze?date_range=${dateRange}`, {
     method: 'POST',
     body: formData,
   })
