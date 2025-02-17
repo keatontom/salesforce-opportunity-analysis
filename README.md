@@ -14,7 +14,7 @@ This is a web application that provides deep insights into user uploaded Salesfo
 - Open opportunity scoring
 - Flexible date range filtering
 - Practice area, type, and account performance tracking
-- 
+
 ## 🛠️ Tech Stack
 
 ### Frontend
