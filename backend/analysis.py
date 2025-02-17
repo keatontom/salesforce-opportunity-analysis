@@ -279,9 +279,9 @@ class SalesOpportunityAnalyzer:
         
         # Aging opportunities
         aging_opportunities = self.data.copy()
-        aging_opportunities['Created Date'] = pd.to_datetime(aging_opportunities['Created Date'], utc=True)
         current_time = pd.Timestamp.now(tz='UTC')
-        aging_opportunities['Days Open'] = (current_time - aging_opportunities['Created Date']).dt.days
+        aging_opportunities['Created Date'] = pd.to_datetime(aging_opportunities['Created Date']).dt.tz_localize('UTC')
+        aging_opportunities['Days Open'] = aging_opportunities['Created Date'].apply(lambda x: (current_time - x).days)
         
         aging_opportunities = aging_opportunities[
             (aging_opportunities['Stage'] != 'Won') & 
