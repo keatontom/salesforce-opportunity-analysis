@@ -5,14 +5,12 @@ import FileUpload from '@/components/FileUpload'
 import Loading from '@/components/Loading'
 import AnalysisResults from '@/components/AnalysisResults'
 import { analyzeFile, AnalysisResults as AnalysisResultsType } from '../lib/api'
-import { DateRange } from '@/components/analysis/DateFilter'
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisResults, setAnalysisResults] = useState<AnalysisResultsType | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [dateRange, setDateRange] = useState<DateRange>('all')
 
   const handleFileUpload = (uploadedFile: File) => {
     setFile(uploadedFile)
@@ -25,30 +23,13 @@ export default function Home() {
     setError(null)
 
     try {
-      const data = await analyzeFile(file, dateRange)
+      const data = await analyzeFile(file)
       setAnalysisResults(data)
     } catch (error) {
       console.error("Error during analysis:", error)
       setError(error instanceof Error ? error.message : 'Failed to analyze file')
     } finally {
       setIsAnalyzing(false)
-    }
-  }
-
-  const handleDateRangeChange = async (newRange: DateRange) => {
-    setDateRange(newRange)
-    if (file && analysisResults) {
-      setIsAnalyzing(true)
-      setError(null)
-      try {
-        const data = await analyzeFile(file, newRange)
-        setAnalysisResults(data)
-      } catch (error) {
-        console.error("Error during analysis:", error)
-        setError(error instanceof Error ? error.message : 'Failed to analyze file')
-      } finally {
-        setIsAnalyzing(false)
-      }
     }
   }
 
@@ -60,10 +41,7 @@ export default function Home() {
       )}
       {isAnalyzing && <Loading />}
       {analysisResults && (
-        <AnalysisResults 
-          results={analysisResults} 
-          onDateRangeChange={handleDateRangeChange}
-        />
+        <AnalysisResults results={analysisResults} />
       )}
       {error && <p className="text-red-500">{error}</p>}
     </main>

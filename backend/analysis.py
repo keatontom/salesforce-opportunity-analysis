@@ -1,13 +1,29 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Union, TypeVar
 import logging
 import traceback
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+T = TypeVar('T', bound=Union[Dict[str, Any], List[Any], int, float, str, None])
+
+def convert_numpy_types(obj: T) -> T:
+    """Convert numpy types to Python native types for JSON serialization"""
+    if isinstance(obj, np.integer):
+        return int(obj)  # type: ignore
+    elif isinstance(obj, np.floating):
+        return float(obj)  # type: ignore
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()  # type: ignore
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}  # type: ignore
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]  # type: ignore
+    return obj
 
 class SalesOpportunityAnalyzer:
     def __init__(self, data: pd.DataFrame, date_range: str = 'all'):
@@ -104,51 +120,10 @@ class SalesOpportunityAnalyzer:
 
     def filter_by_date_range(self, date_range: str):
         """
-        Filter data based on date range
+        Filter data based on date range (currently disabled - showing all data)
         """
-        logger.info(f"Filtering data by date range: {date_range}")
-        logger.info(f"Data shape before filtering: {self.data.shape}")
-        
-        if date_range == 'all':
-            logger.info("Using all data (no date filtering)")
-            return
-            
-        try:
-            today = pd.Timestamp.now()
-            
-            if date_range == 'ytd':
-                start_date = today.replace(month=1, day=1)
-                end_date = today
-            elif date_range == 'q1':
-                start_date = today.replace(month=1, day=1)
-                end_date = today.replace(month=3, day=31)
-            elif date_range == 'q2':
-                start_date = today.replace(month=4, day=1)
-                end_date = today.replace(month=6, day=30)
-            elif date_range == 'q3':
-                start_date = today.replace(month=7, day=1)
-                end_date = today.replace(month=9, day=30)
-            elif date_range == 'q4':
-                start_date = today.replace(month=10, day=1)
-                end_date = today.replace(month=12, day=31)
-            else:
-                logger.warning(f"Unknown date range '{date_range}', using all data")
-                return
-                
-            logger.info(f"Filtering data from {start_date} to {end_date}")
-            self.data = self.data[
-                (self.data['Created Date'] >= start_date) & 
-                (self.data['Created Date'] <= end_date)
-            ]
-            
-            logger.info(f"Data shape after filtering: {self.data.shape}")
-            logger.info(f"Date range of filtered data: {self.data['Created Date'].min()} to {self.data['Created Date'].max()}")
-            
-        except Exception as e:
-            logger.error(f"Error during date filtering: {str(e)}")
-            logger.error(traceback.format_exc())
-            # If there's an error in filtering, keep all data
-            logger.warning("Using all data due to filtering error")
+        logger.info("Date filtering disabled - showing all data")
+        return
     
     def calculate_core_metrics(self) -> Dict[str, Any]:
         """
@@ -162,13 +137,15 @@ class SalesOpportunityAnalyzer:
         avg_deal_size = self.data['Total ACV'].mean() if not self.data['Total ACV'].empty else 0
         avg_time_to_close = self.data['Time_To_Close'].mean() if not self.data['Time_To_Close'].empty else 0
         
-        return {
+        metrics = {
             "Total Volume": round(self.data['Total ACV'].sum(), 2),
             "Average Deal Size": round(avg_deal_size, 2),
             "Win Rate": round(win_rate, 2),
             "Average Time to Close": round(avg_time_to_close, 2),
             "Number of Opportunities": total_opportunities
         }
+        
+        return convert_numpy_types(metrics)
     
     def calculate_trends(self) -> Dict[str, Any]:
         """
@@ -902,7 +879,7 @@ def analyze_opportunities(file_path: str, date_range: str = 'all') -> Dict[str, 
         open_opportunities = analyzer.score_open_opportunities()
         
         logger.info("Analysis completed successfully")
-        return {
+        results = {
             "Core Metrics": core_metrics,
             "Segment Performance": segment_performance,
             "Pipeline Health": pipeline_health,
@@ -910,6 +887,9 @@ def analyze_opportunities(file_path: str, date_range: str = 'all') -> Dict[str, 
             "Win Analysis": win_analysis,
             "Score Open Opportunities": open_opportunities
         }
+        
+        # Convert all numpy types to Python native types before returning
+        return convert_numpy_types(results)
     except Exception as e:
         logger.error(f"Error during analysis: {str(e)}")
         logger.error(f"Error traceback: {traceback.format_exc()}")

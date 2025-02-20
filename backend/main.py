@@ -5,10 +5,10 @@ from services import comprehensive_report_analysis
 app = FastAPI()
 
 origins = [
+    "http://localhost:3000",  # Local development frontend
+    "http://localhost:3001",  # Alternative local port
     "https://v0-salesforce-opprtunity-kehsxnvvjsw.vercel.app",  # Your Vercel frontend without trailing slash
     "https://v0-salesforce-opprtunity-kehsxnvvjsw.vercel.app/",  # Your Vercel frontend with trailing slash
-    "http://localhost:3000",  # Allow local development
-    "http://localhost:3000/"  # Allow local development with trailing slash
 ]
 
 # ✅ Add CORS settings

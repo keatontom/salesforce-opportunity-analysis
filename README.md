@@ -12,7 +12,6 @@ This is a web application that provides deep insights into user uploaded Salesfo
 - Interactive data visualization
 - Pipeline health assessment
 - Open opportunity scoring
-- Flexible date range filtering
 - Practice area, type, and account performance tracking
 
 ## 🛠️ Tech Stack

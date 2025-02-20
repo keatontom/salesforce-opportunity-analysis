@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { AnalysisResults as AnalysisResultsType } from '@/types/analysis'
 import CoreMetrics from './analysis/CoreMetrics'
 import PipelineHealth from './analysis/PipelineHealth'
-import DateFilter, { DateRange } from './analysis/DateFilter'
 import AgingOpportunitiesTable from './analysis/AgingOpportunitiesTable'
 import TrendAnalysis from './analysis/TrendAnalysis'
 import LossAnalysis from './analysis/LossAnalysis'
@@ -12,23 +11,15 @@ import PerformanceAnalysis from './analysis/PerformanceAnalysis'
 
 interface AnalysisResultsProps {
   results: AnalysisResultsType;
-  onDateRangeChange?: (range: DateRange) => void;
 }
 
-export default function AnalysisResults({ results, onDateRangeChange }: AnalysisResultsProps) {
-  const [dateRange, setDateRange] = useState<DateRange>('all')
+export default function AnalysisResults({ results }: AnalysisResultsProps) {
   const [showAgingOpportunities, setShowAgingOpportunities] = useState(false)
-
-  const handleDateChange = (range: DateRange) => {
-    setDateRange(range)
-    onDateRangeChange?.(range)
-  }
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Analysis Results</h2>
-        <DateFilter value={dateRange} onChange={handleDateChange} />
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

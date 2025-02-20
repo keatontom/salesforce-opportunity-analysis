@@ -147,8 +147,6 @@ export interface AnalysisResults {
   "Visualizations": Visualizations;
 }
 
-export type DateRange = 'all' | 'q1' | 'q2' | 'q3' | 'q4' | 'ytd' | 'last_year'; 
-
 export interface TypeOpportunity {
   "Account Name": string;
   "Opportunity Name": string;
