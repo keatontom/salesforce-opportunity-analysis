@@ -29,11 +29,6 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
           onViewAgingOpportunities={() => setShowAgingOpportunities(true)}
         />
       </div>
-
-      <TrendAnalysis 
-        winRateData={results.Visualizations["Win Rate Trend"]}
-        volumeData={results.Visualizations["Volume Trend"]}
-      />
       
       <section>
         <h2 className="text-xl font-semibold mb-4">Analysis by Stage</h2>
@@ -47,6 +42,11 @@ export default function AnalysisResults({ results }: AnalysisResultsProps) {
           />
         </div>
       </section>
+
+      <TrendAnalysis 
+        winRateData={results.Visualizations["Win Rate Trend"]}
+        volumeData={results.Visualizations["Volume Trend"]}
+      />
 
       <PerformanceAnalysis 
         segmentPerformance={results["Advanced Analysis"]["Segment Performance"]}
